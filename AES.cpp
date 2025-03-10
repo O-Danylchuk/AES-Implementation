@@ -7,46 +7,61 @@ AES::AES(const std::vector<uint8_t> &key)
 
 void AES::keyExpansion(const std::vector<uint8_t> &key)
 {
-    if (key.size() == 16)
-    {
-        roundKeys.resize(176); // 16 bytes * 11 rounds = 176 bytes
+    size_t keySize = key.size();
+    size_t expandedKeySize = 0;
+    size_t numRounds = 0;
 
-        for (size_t i = 0; i < 16; ++i)
-        {
-            roundKeys[i] = key[i];
-        }
-
-        uint8_t temp[4];
-        int bytesGenerated = 16;
-        int rcon = 1;
-
-        while (bytesGenerated < 176)
-        {
-            for (uint8_t i = 0; i < 4; ++i) {
-                temp[i] = roundKeys[bytesGenerated - 4 + i];
-            }
-
-            if (bytesGenerated % 16 == 0) {
-                uint8_t t = temp[0];
-                temp[0] = sbox[temp[1]] ^ rcon;
-                temp[1] = sbox[temp[2]];
-                temp[2] = sbox[temp[3]];
-                temp[3] = sbox[t];
-
-                temp[0] ^= rcon;
-
-                rcon = (rcon << 1) ^ (rcon & 0x80 ? 0x1B : 0x00); // GF(2⁸) multiplication
-            }
-
-            for (uint8_t i = 0; i < 4; ++i) {
-                roundKeys[bytesGenerated] = roundKeys[bytesGenerated - 16] ^ temp[i];
-                bytesGenerated++;
-            }
-        }
+    if (keySize == 16) { // AES-128
+        expandedKeySize = 176;
+        numRounds = 10;
+    } else if (keySize == 24) { // AES-192
+        expandedKeySize = 208;
+        numRounds = 12;
+    } else if (keySize == 32) { // AES-256
+        expandedKeySize = 240;
+        numRounds = 14;
+    } else {
+        std::cerr << "Invalid key size. Supported sizes: 128, 192, 256 bits." << std::endl;
+        return;
     }
-    else
+
+    roundKeys.resize(expandedKeySize);
+
+    for (size_t i = 0; i < keySize; ++i) {
+        roundKeys[i] = key[i];
+    }
+
+    uint8_t temp[4];
+    size_t bytesGenerated = keySize;
+    int rcon = 1;
+
+    while (bytesGenerated < expandedKeySize)
     {
-        std::cerr << "Key length is not 128 bits" << std::endl;
+        for (uint8_t i = 0; i < 4; ++i) {
+            temp[i] = roundKeys[bytesGenerated - 4 + i];
+        }
+
+        if (bytesGenerated % keySize == 0) {
+            // RotWord
+            uint8_t t = temp[0];
+            temp[0] = sbox[temp[1]] ^ rcon;
+            temp[1] = sbox[temp[2]];
+            temp[2] = sbox[temp[3]];
+            temp[3] = sbox[t];
+
+            rcon = (rcon << 1) ^ (rcon & 0x80 ? 0x1B : 0x00); // GF(2⁸) multiplication
+        }
+        else if (keySize == 32 && bytesGenerated % keySize == 16) {
+            temp[0] = sbox[temp[0]];
+            temp[1] = sbox[temp[1]];
+            temp[2] = sbox[temp[2]];
+            temp[3] = sbox[temp[3]];
+        }
+
+        for (uint8_t i = 0; i < 4; ++i) {
+            roundKeys[bytesGenerated] = roundKeys[bytesGenerated - keySize] ^ temp[i];
+            bytesGenerated++;
+        }
     }
 }
 
