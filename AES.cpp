@@ -1,4 +1,22 @@
 #include "AES.h"
+#include <random>
+
+std::vector<uint8_t> AES::generateKey()
+{
+    std::vector<uint8_t> key(16);
+    std::random_device rd;
+
+    for (size_t i = 0; i < 16; ++i) {
+        key[i] = rd() % 256;
+    }
+
+    return key;
+}
+
+AES::AES()
+{
+    keyExpansion(generateKey());
+}
 
 AES::AES(const std::vector<uint8_t> &key)
 {
@@ -11,7 +29,7 @@ void AES::keyExpansion(const std::vector<uint8_t> &key)
     size_t expandedKeySize = 0;
     size_t numRounds = 0;
 
-    if (keySize == 16) { // AES-128
+    if (keySize == 16) {        // AES-128
         expandedKeySize = 176;
         numRounds = 10;
     } else if (keySize == 24) { // AES-192
