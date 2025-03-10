@@ -1,21 +1,24 @@
 #include "AES.h"
 #include <random>
+#include <openssl/rand.h>
 
-std::vector<uint8_t> AES::generateKey()
-{
-    std::vector<uint8_t> key(16);
-    std::random_device rd;
-
-    for (size_t i = 0; i < 16; ++i) {
-        key[i] = rd() % 256;
+std::vector<uint8_t> AES::generateKey(const size_t keyLen) {
+    std::vector<uint8_t> key(keyLen);  // AES-128 key (use 32 for AES-256)
+    if (RAND_bytes(key.data(), key.size()) != 1) {
+        throw std::runtime_error("Failed to generate a secure random key");
     }
-
     return key;
 }
 
-AES::AES()
-{
-    keyExpansion(generateKey());
+AES::AES() {
+    keyExpansion(generateKey(16)); // AES-128 as default mode
+}
+
+AES::AES(const size_t keyLen) {
+    if (keyLen != 16 && keyLen != 24 && keyLen != 32) {
+        throw std::invalid_argument("Invalid key length. Supported sizes: 128, 192, 256 bits.");
+    }
+    keyExpansion(generateKey(keyLen));
 }
 
 AES::AES(const std::vector<uint8_t> &key)
@@ -179,27 +182,51 @@ void AES::invMixColumns(uint8_t state[4][4]) {
 }
 
 void AES::aesDecryptBlock(uint8_t state[4][4], const std::vector<uint8_t>& roundKeys) {
-    // Add the round key for the last round (round 10)
-    addRoundKey(state, &roundKeys[160]);
+    size_t keySize = roundKeys.size();
+    size_t numRounds = 0;
+    
+    // Validate key size and determine rounds
+    if (keySize == 176) numRounds = 10;
+    else if (keySize == 208) numRounds = 12;
+    else if (keySize == 240) numRounds = 14;
+    else {
+        std::cerr << "Invalid key size. Supported sizes: 128, 192, 256 bits." << std::endl;
+        return;
+    }
 
-    // Perform rounds 9 through 1
-    for (int round = 9; round > 0; --round) {
+    // Add the round key for the last round
+    addRoundKey(state, &roundKeys[numRounds * 16]);
+
+    // Perform rounds (numRounds - 1) through 1
+    for (size_t round = numRounds - 1; round > 0; --round) {
         invSubBytes(state);
         invShiftRows(state);
-        addRoundKey(state, &roundKeys[round * 16]); 
+        addRoundKey(state, &roundKeys[round * 16]);
         invMixColumns(state);
     }
 
+    // Final round (without MixColumns)
     invSubBytes(state);
     invShiftRows(state);
-    addRoundKey(state, roundKeys.data());  // Use the first round key (index 0)
+    addRoundKey(state, roundKeys.data());  // Use the first round key
 }
 
 void AES::aesEncryptBlock(uint8_t state[4][4], const std::vector<uint8_t>& roundKeys) {
-    // Add the round key for the first round (round 1)
-    addRoundKey(state, roundKeys.data());
+    size_t keySize = roundKeys.size();
+    size_t numRounds = 0;
+    
+    // Validate key size and determine rounds
+    if (keySize == 176) numRounds = 10;
+    else if (keySize == 208) numRounds = 12;
+    else if (keySize == 240) numRounds = 14;
+    else {
+        std::cerr << "Invalid key size. Supported sizes: 128, 192, 256 bits." << std::endl;
+        return;
+    }
 
-    for (int round = 0; round < 9; ++round) {
+    addRoundKey(state, roundKeys.data());  // Use the first round key
+
+    for (int round = 0; round < numRounds - 1; ++round) {
         subBytes(state);      
         shiftRows(state);     
         mixColumns(state);   
@@ -208,5 +235,5 @@ void AES::aesEncryptBlock(uint8_t state[4][4], const std::vector<uint8_t>& round
 
     subBytes(state);
     shiftRows(state);
-    addRoundKey(state, &roundKeys[160]);  // Use the last round key (round 10)
+    addRoundKey(state, &roundKeys[numRounds * 16]);  // Use the last round key (round 10)
 }

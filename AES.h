@@ -9,6 +9,8 @@ public:
 
     AES();
 
+    AES(const size_t keyLen);
+
     void keyExpansion(const std::vector<uint8_t>& key);
 
     void printRoundKeys();
@@ -62,7 +64,7 @@ private:
         0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D
     }; // inverse sbox
 
-    std::vector<uint8_t> generateKey();
+    std::vector<uint8_t> generateKey(const size_t keyLen);
 
     uint8_t gmul(uint8_t a, uint8_t b);
 
