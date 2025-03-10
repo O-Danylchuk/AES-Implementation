@@ -64,6 +64,7 @@ private:
         0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D
     }; // inverse sbox
 
+protected:
     std::vector<uint8_t> generateKey(const size_t keyLen);
 
     uint8_t gmul(uint8_t a, uint8_t b);
@@ -81,5 +82,28 @@ private:
     void invShiftRows(uint8_t state[4][4]);
 
     void invMixColumns(uint8_t state[4][4]);
+
+    std::vector<uint8_t> addPadding(const std::vector<uint8_t>& data) {
+        size_t paddingSize = 16 - (data.size() % 16);
+
+        std::vector<uint8_t> paddedData = data;
+
+        paddedData.insert(paddedData.end(), paddingSize, static_cast<uint8_t>(paddingSize));
+        return paddedData;
+    }
+    
+    std::vector<uint8_t> removePadding(const std::vector<uint8_t>& data) {
+        if (data.empty()) return data;
+    
+        uint8_t paddingValue = data.back();
+        if (paddingValue == 0 || paddingValue > 16) return data; // Invalid padding
+    
+        // Validate all padding bytes
+        for (size_t i = data.size() - paddingValue; i < data.size(); ++i) {
+            if (data[i] != paddingValue) return data; // Corrupt padding, return unchanged
+        }
+    
+        return std::vector<uint8_t>(data.begin(), data.begin() + (data.size() - paddingValue));
+    }
 
 };

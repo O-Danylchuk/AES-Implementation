@@ -8,55 +8,44 @@ public:
         m_iv = generateIV();
     }
 
+    AES_CFB(const size_t keyLen) {
+        setKey(AES::generateKey(keyLen));
+        m_iv = generateIV();
+    }
+
     std::vector<uint8_t> encrypt(const std::vector<uint8_t>& data) {
-        std::vector<uint8_t> encryptedData(data.size());
+        std::vector<uint8_t> paddedData = addPadding(data);
+        std::vector<uint8_t> encryptedData(paddedData.size());
         std::vector<uint8_t> iv = m_iv;
-
         uint8_t block[4][4];
-        std::vector<uint8_t> xorBlock(16);
 
-        for (size_t i = 0; i < data.size(); i += 16) {
-            uint8_t block[4][4];
-
+        for (size_t i = 0; i < paddedData.size(); i += 16) {
             copyToBlock(iv, block);
             aesEncryptBlock(block, AES::getRoundKeys());
-
             std::vector<uint8_t> keystream = blockToVector(block);
-            
-            for (size_t j = 0; j < 16 && (i + j) < data.size(); ++j) {
-                encryptedData[i + j] = data[i + j] ^ keystream[j];
+            for (size_t j = 0; j < 16 && (i + j) < paddedData.size(); ++j) {
+                encryptedData[i + j] = paddedData[i + j] ^ keystream[j];
             }
-            
-            iv.assign(encryptedData.begin() + i, encryptedData.begin() + std::min(i + 16, data.size()));
+            iv.assign(encryptedData.begin() + i, encryptedData.begin() + std::min(i + 16, paddedData.size()));
         }
-
         return encryptedData;
     }
 
     std::vector<uint8_t> decrypt(const std::vector<uint8_t>& data) {
         std::vector<uint8_t> decryptedData(data.size());
         std::vector<uint8_t> iv = m_iv;
-
         uint8_t block[4][4];
-        std::vector<uint8_t> xorBlock(16);
 
         for (size_t i = 0; i < data.size(); i += 16) {
-            uint8_t block[4][4];
-
             copyToBlock(iv, block);
             aesEncryptBlock(block, AES::getRoundKeys());
-
             std::vector<uint8_t> keystream = blockToVector(block);
-            
             for (size_t j = 0; j < 16 && (i + j) < data.size(); ++j) {
                 decryptedData[i + j] = data[i + j] ^ keystream[j];
             }
-            
             iv.assign(data.begin() + i, data.begin() + std::min(i + 16, data.size()));
         }
-
-        return decryptedData;
-
+        return removePadding(decryptedData);
     }
 
     void setKey(const std::vector<uint8_t>& key) {

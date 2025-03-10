@@ -6,12 +6,17 @@ class AES_ECB : public AES {
 public:
     AES_ECB() = default;
 
-    std::vector<uint8_t> encrypt(const std::vector<uint8_t>& plaintext) {
-        std::vector<uint8_t> encryptedData(plaintext.size());
+    AES_ECB(const size_t keyLen) {
+        setKey(AES::generateKey(keyLen));
+    }
 
-        for (size_t i = 0; i < plaintext.size(); i += 16) {
+    std::vector<uint8_t> encrypt(const std::vector<uint8_t>& plaintext) {
+        std::vector<uint8_t> paddedText = addPadding(plaintext);
+        std::vector<uint8_t> encryptedData(paddedText.size());
+
+        for (size_t i = 0; i < paddedText.size(); i += 16) {
             uint8_t block[4][4];
-            copyToBlock(plaintext.data() + i, block);
+            copyToBlock(paddedText.data() + i, block);
 
             aesEncryptBlock(block, AES::getRoundKeys());
 
@@ -29,13 +34,13 @@ public:
             uint8_t block[4][4];
             copyToBlock(ciphertext.data() + i, block);
 
-            aesDecryptBlock(block, AES::getRoundKeys()); 
+            aesDecryptBlock(block, AES::getRoundKeys());
 
             std::vector<uint8_t> decryptedBlock = blockToVector(block);
             std::copy(decryptedBlock.begin(), decryptedBlock.end(), decryptedData.begin() + i);
         }
 
-        return decryptedData;
+        return removePadding(decryptedData);
     }
 
     void setKey(const std::vector<uint8_t>& key) {
